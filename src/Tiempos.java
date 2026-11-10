@@ -1,10 +1,12 @@
+import com.sun.management.ThreadMXBean;
+import java.lang.management.ManagementFactory;
 import java.util.Random;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * Imprime el tiempo promedio de cada algoritmo con datos mock grandes.
+ * Imprime el tiempo promedio y la memoria reservada por ejecución de cada algoritmo con datos mock grandes.
  * Cada caso se calienta antes de medir para que el JIT no distorsione el resultado;
  * aun así los tiempos son orientativos y cambian entre máquinas y ejecuciones.
  *
@@ -15,14 +17,19 @@ public final class Tiempos {
 
     private static final long CALENTAMIENTO_MS = 200;
 
+    // Bytes reservados en el heap por este hilo: mide lo que pide cada algoritmo, sin depender del GC.
+    // shortcut: no cuenta la pila de recursión (merge sort usa O(log n) marcos), usar un profiler si hace falta.
+    private static final ThreadMXBean HILO = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+
     // Semilla fija: mismos datos en cada ejecución. Rango 1..10^9 como en la restricción del ejercicio.
     private static final int[] MOCK_100K = new Random(42).ints(100_000, 1, 1_000_000_001).toArray();
     private static final int[] MOCK_1M = new Random(42).ints(1_000_000, 1, 1_000_000_001).toArray();
 
     public static void main(String[] args) {
-        System.out.printf("Tiempo promedio por ejecución (datos mock, semilla 42, %d ms de calentamiento)%n", CALENTAMIENTO_MS);
+        System.out.printf("Tiempo y memoria (heap) promedio por ejecución (datos mock, semilla 42, %d ms de calentamiento)%n", CALENTAMIENTO_MS);
 
         // clone(): getNumberOfInversions ordena el arreglo, sin copia la siguiente repetición mediría un arreglo ya ordenado.
+        // La copia suma 4n bytes a la memoria medida de merge sort (además de los 4n de aux).
         System.out.println(System.lineSeparator() + "1. Divide y vencerás: número de inversiones");
         medir("merge sort   O(n log n), n = 100.000", 50, () -> Inversions.getNumberOfInversions(MOCK_100K.clone()));
         medir("merge sort   O(n log n), n = 1.000.000", 10, () -> Inversions.getNumberOfInversions(MOCK_1M.clone()));
@@ -42,9 +49,12 @@ public final class Tiempos {
         // Calentar por tiempo y no por número de llamadas; siempre corre al menos una vez.
         final long finCalentamiento = System.nanoTime() + CALENTAMIENTO_MS * 1_000_000;
         Stream.generate(algoritmo).takeWhile(r -> System.nanoTime() < finCalentamiento).count();
+        final long memoriaInicio = HILO.getCurrentThreadAllocatedBytes();
         final long inicio = System.nanoTime();
         final Object resultado = IntStream.range(0, repeticiones).mapToObj(i -> algoritmo.get()).reduce((a, b) -> b).orElseThrow();
         final long promedio = (System.nanoTime() - inicio) / repeticiones;
-        System.out.printf("  %-40s %,16d ns  %,12.3f ms   resultado = %,d%n", caso, promedio, promedio / 1e6, resultado);
+        final long memoria = (HILO.getCurrentThreadAllocatedBytes() - memoriaInicio) / repeticiones;
+        System.out.printf("  %-40s %,16d ns  %,12.3f ms  %,12.1f KB   resultado = %,d%n",
+                caso, promedio, promedio / 1e6, memoria / 1024.0, resultado);
     }
 }

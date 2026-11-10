@@ -53,35 +53,38 @@ Los resultados coinciden con los *samples* de la presentación. Además se verif
 - La prueba de estrés de `Inversions` corrió 5 000 arreglos aleatorios sin diferencias entre la versión `O(n²)` y la `O(n log n)`.
 - En `ChangeGreedy` los dos enfoques dan el mismo resultado para todo `m` entre 1 y 1 000.
 
-## Tiempos de ejecución
+## Tiempos de ejecución y memoria
 
 ```bash
 java -cp out Tiempos
 ```
 
-Mide el tiempo promedio de cada algoritmo con datos mock (arreglos aleatorios con semilla fija 42, valores entre 1 y 10⁹). Antes de medir, cada caso se calienta 200 ms para que el JIT no distorsione el resultado. Los tiempos son orientativos y cambian entre máquinas.
+Mide, para cada algoritmo, el **tiempo promedio** y la **memoria reservada en el heap** por ejecución, con datos mock (arreglos aleatorios con semilla fija 42, valores entre 1 y 10⁹). Antes de medir, cada caso se calienta 200 ms para que el JIT no distorsione el resultado. Los tiempos son orientativos y cambian entre máquinas.
+
+La memoria se obtiene con `ThreadMXBean.getCurrentThreadAllocatedBytes()`: bytes que el hilo pidió al heap durante la llamada, sin depender del recolector de basura. No incluye la pila de recursión.
 
 ```
 1. Divide y vencerás: número de inversiones
-  merge sort   O(n log n), n = 100.000            5,621,215 ns         5.621 ms   resultado = 2,501,817,025
-  merge sort   O(n log n), n = 1.000.000         68,255,929 ns        68.256 ms   resultado = 250,123,851,010
-  fuerza bruta O(n²),      n = 100.000        2,309,951,125 ns     2,309.951 ms   resultado = 2,501,817,025
+  merge sort   O(n log n), n = 100.000            5,801,434 ns         5.801 ms         781.9 KB   resultado = 2,501,817,025
+  merge sort   O(n log n), n = 1.000.000         67,715,104 ns        67.715 ms       7,812.6 KB   resultado = 250,123,851,010
+  fuerza bruta O(n²),      n = 100.000        2,310,409,667 ns     2,310.410 ms           0.3 KB   resultado = 2,501,817,025
 
 2. Programación dinámica: cambio con monedas 1, 3, 4
-  money = 1.000      O(money·k)                       2,146 ns         0.002 ms   resultado = 250
-  money = 1.000.000  O(money·k)                   1,581,191 ns         1.581 ms   resultado = 250,000
+  money = 1.000      O(money·k)                       2,687 ns         0.003 ms           3.9 KB   resultado = 250
+  money = 1.000.000  O(money·k)                   1,768,304 ns         1.768 ms       3,906.3 KB   resultado = 250,000
 
 3. Voraz: cambio con monedas 1, 5, 10
-  aritmética m = 1.000.000      O(k)                     35 ns         0.000 ms   resultado = 100,000
-  voraz      m = 1.000.000      O(m)                 24,797 ns         0.025 ms   resultado = 100,000
-  voraz      m = 1.000.000.000  O(m)             26,088,791 ns        26.089 ms   resultado = 100,000,000
+  aritmética m = 1.000.000      O(k)                     35 ns         0.000 ms           0.0 KB   resultado = 100,000
+  voraz      m = 1.000.000      O(m)                 26,739 ns         0.027 ms           0.0 KB   resultado = 100,000
+  voraz      m = 1.000.000.000  O(m)             24,430,722 ns        24.431 ms           0.1 KB   resultado = 100,000,000
 ```
 
 Lectura:
 
-- **Divide y vencerás:** con n = 100 000, merge sort es unas **400 veces** más rápido que la fuerza bruta (5,6 ms vs. 2,3 s) y ambos dan el mismo resultado. Al multiplicar n por 10, merge sort tarda unas 12 veces más (`n log n`); la fuerza bruta tardaría unas 100 veces más (`n²`).
-- **Programación dinámica:** crece en línea recta con `money` (×1 000 en datos ≈ ×700 en tiempo) y además reserva un arreglo de `money + 1` enteros (~4 MB para 1 000 000).
-- **Voraz:** el enfoque aritmético es prácticamente instantáneo (`O(k)`, no depende de `m`). El bucle voraz es `O(m)` porque suma una moneda de 10 a la vez, pero sin memoria extra.
+- **Divide y vencerás:** con n = 100 000, merge sort es unas **400 veces** más rápido que la fuerza bruta (5,8 ms vs. 2,3 s) y ambos dan el mismo resultado. Al multiplicar n por 10, merge sort tarda unas 12 veces más (`n log n`); la fuerza bruta tardaría unas 100 veces más (`n²`). El precio es la memoria: merge sort reserva `O(n)` (781 KB = 8 bytes × n: 4n del arreglo `aux` y 4n de la copia de la entrada que hace la medición), mientras que la fuerza bruta no reserva nada (`O(1)`).
+- **Programación dinámica:** el tiempo crece en línea recta con `money` (×1 000 en datos ≈ ×650 en tiempo) y la memoria también: la tabla `minCoins` ocupa 4 × (`money` + 1) bytes, es decir 3,9 KB para 1 000 y 3,9 MB para 1 000 000.
+- **Voraz:** es la técnica más barata en memoria, ya que no reserva nada (`O(1)`). El enfoque aritmético es prácticamente instantáneo (`O(k)`, no depende de `m`). El bucle voraz es `O(m)` porque suma una moneda de 10 a la vez.
+- Los ~0,1–0,3 KB que aparecen en los casos `O(1)` son el costo de la propia medición (el resultado se empaqueta como objeto), no del algoritmo.
 
 ## Tabla comparativa
 
